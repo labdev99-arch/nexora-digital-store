@@ -1,10 +1,8 @@
 {
   "crons": [
-    {"path": "/api/cron/fulfillment", "schedule": "* * * * *"},
-    {"path": "/api/cron/abandoned-carts", "schedule": "0 * * * *"},
-    {"path": "/api/cron/reseller-webhooks", "schedule": "* * * * *"},
-    {"path": "/api/cron/notifications", "schedule": "* * * * *"},
-    {"path": "/api/cron/ai", "schedule": "*/5 * * * *"},
-    {"path": "/api/cron/retention", "schedule": "15 2 * * *"}
+    {
+      "path": "/api/cron/retention",
+      "schedule": "15 2 * * *"
+    }
   ]
 }

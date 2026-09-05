@@ -8,6 +8,8 @@
 4. Back up the production database and record the current Vercel deployment and migration number.
 5. Apply forward-compatible migrations, deploy Vercel, then run the smoke checklist. Destructive cleanup ships in a later release only.
 
+On Vercel Hobby, only the daily retention endpoint is scheduled by `vercel.json`. High-frequency fulfillment, notification, webhook, abandoned-cart, and AI workers must be scheduled through Supabase Cron/Edge Functions with the same signed worker routes; do not add sub-daily Vercel cron expressions unless the project moves to Pro.
+
 ## Roll back
 
 If application errors rise, immediately promote the last healthy Vercel deployment. Keep schema changes backward-compatible; never attempt an ad-hoc destructive down migration. Disable the affected feature/provider with feature flags, stop its cron, restore from backup/PITR only for confirmed data corruption, and reconcile wallets/orders after recovery. Record timeline, scope, and corrective action in an incident report.
