@@ -14,6 +14,7 @@ import {Alert, Tabs, TabsList, TabsTrigger} from '@/components/ui/surfaces';
 import {Link} from '@/i18n/navigation';
 import {publicEnvironment} from '@/lib/env/public';
 import {cn} from '@/lib/utils';
+import {TurnstileChallenge} from './turnstile-challenge';
 import {
   requestPasswordResetAction,
   resetPasswordAction,
@@ -36,6 +37,7 @@ type Values = {
   confirmPassword: string;
   marketingConsent: boolean;
   token: string;
+  turnstileToken: string;
 };
 
 const clientSchema = z.object({
@@ -45,7 +47,8 @@ const clientSchema = z.object({
   password: z.string(),
   confirmPassword: z.string(),
   marketingConsent: z.boolean(),
-  token: z.string()
+  token: z.string(),
+  turnstileToken: z.string()
 });
 
 export function AuthPanel({mode, factorId}: {mode: AuthMode; factorId?: string}) {
@@ -65,7 +68,8 @@ export function AuthPanel({mode, factorId}: {mode: AuthMode; factorId?: string})
       password: '',
       confirmPassword: '',
       marketingConsent: false,
-      token: ''
+      token: '',
+      turnstileToken: ''
     }
   });
 
@@ -90,7 +94,13 @@ export function AuthPanel({mode, factorId}: {mode: AuthMode; factorId?: string})
       return;
     }
     if (mode === 'forgot-password') {
-      run(() => requestPasswordResetAction({email: values.email, locale}));
+      run(() =>
+        requestPasswordResetAction({
+          email: values.email,
+          locale,
+          turnstileToken: values.turnstileToken
+        })
+      );
       return;
     }
     if (mode === 'reset-password') {
@@ -102,7 +112,9 @@ export function AuthPanel({mode, factorId}: {mode: AuthMode; factorId?: string})
       return;
     }
     if (method === 'magic') {
-      run(() => sendMagicLinkAction({email: values.email, locale}));
+      run(() =>
+        sendMagicLinkAction({email: values.email, locale, turnstileToken: values.turnstileToken})
+      );
       return;
     }
     if (method === 'phone') {
@@ -117,7 +129,14 @@ export function AuthPanel({mode, factorId}: {mode: AuthMode; factorId?: string})
       }
       return;
     }
-    run(() => signInAction({email: values.email, password: values.password, locale}));
+    run(() =>
+      signInAction({
+        email: values.email,
+        password: values.password,
+        locale,
+        turnstileToken: values.turnstileToken
+      })
+    );
   });
 
   const titleKey = mode === 'sign-in' ? 'signInTitle' : `${mode.replaceAll('-', '')}Title`;
@@ -247,6 +266,10 @@ export function AuthPanel({mode, factorId}: {mode: AuthMode; factorId?: string})
           <Link className="auth-forgot" href="/auth/forgot-password">
             {t('forgotPassword')}
           </Link>
+        ) : null}
+
+        {mode === 'sign-up' || mode === 'forgot-password' || mode === 'sign-in' ? (
+          <TurnstileChallenge onToken={(token) => form.setValue('turnstileToken', token)} />
         ) : null}
 
         <Button

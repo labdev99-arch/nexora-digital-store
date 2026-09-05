@@ -1,0 +1,5 @@
+# Phase 12 — launch hardening
+
+Delivered: automated RLS/policy and mutation/secret CI audits; CSRF/Fetch Metadata, CSP/security headers, Upstash-class rate limits, Turnstile, sanitized inputs, PII-safe logs/Sentry, private signed-file posture, compliance consent/legal/export/deletion/retention flows, health/monitoring and rollback/backup procedures, performance/bundle/CWV budgets, top-query EXPLAIN suite and indexes, k6 checkout/API load scenario, WCAG/RTL Playwright checks, full operating/API/admin/launch documentation, and exact external credential blockers.
+
+Production evidence that cannot be fabricated in source control remains a launch gate: restore the inactive Supabase project, apply migrations, run live RLS/advisors/EXPLAIN/database concurrency suites, supply staging test identities/providers, capture full Playwright provider matrix and k6/Lighthouse artifacts, enable backup/PITR/uptime/Sentry alerts, and complete external provider approvals. See `CREDENTIALS_REQUIRED.md` and `LAUNCH_CHECKLIST.md`.

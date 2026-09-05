@@ -1,3 +1,5 @@
+'use client';
+
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -8,6 +10,7 @@ import {
   ShieldCheck,
   WalletCards
 } from 'lucide-react';
+import {useEffect, useState} from 'react';
 
 import {Button} from '@/components/ui/button';
 import {Badge, Card, EmptyState} from '@/components/ui/surfaces';
@@ -15,6 +18,7 @@ import {formatDate} from '@/i18n/formatters';
 import {Link} from '@/i18n/navigation';
 import type {AppLocale} from '@/i18n/routing';
 import {formatMinorUnits} from '@/lib/money';
+import {createClient} from '@/lib/supabase/client';
 import type {WalletOverview as WalletOverviewData} from '../types';
 
 type Labels = {
@@ -45,6 +49,7 @@ type Labels = {
 
 export function WalletOverview({
   locale,
+  profileId,
   data,
   labels,
   values,
@@ -52,12 +57,49 @@ export function WalletOverview({
   pageSize
 }: {
   locale: AppLocale;
+  profileId: string;
   data: WalletOverviewData;
   labels: Labels;
   values: Record<string, string | undefined>;
   page: number;
   pageSize: number;
 }) {
+  const [balances, setBalances] = useState(data.balances);
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`wallet:${profileId}`)
+      .on(
+        'postgres_changes',
+        {event: '*', schema: 'public', table: 'wallets', filter: `owner_id=eq.${profileId}`},
+        (payload) => {
+          const row = payload.new as {
+            id?: string;
+            account_type?: string;
+            cached_balance?: number;
+            locked?: boolean;
+          };
+          if (!row.id) return;
+          setBalances((current) =>
+            current.map((balance) => {
+              if (row.id === balance.availableWalletId)
+                return {
+                  ...balance,
+                  available: Number(row.cached_balance ?? balance.available),
+                  frozen: Boolean(row.locked)
+                };
+              if (row.id === balance.holdWalletId)
+                return {...balance, held: Number(row.cached_balance ?? balance.held)};
+              return balance;
+            })
+          );
+        }
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [profileId]);
   const pages = Math.max(Math.ceil(data.totalTransactions / pageSize), 1);
   const params = new URLSearchParams(
     Object.entries(values).filter((entry): entry is [string, string] => Boolean(entry[1]))
@@ -82,7 +124,7 @@ export function WalletOverview({
       </header>
 
       <section className="wallet-balance-grid">
-        {data.balances.map((balance) => (
+        {balances.map((balance) => (
           <Card className="wallet-balance-card" key={balance.currencyCode}>
             <div className="wallet-balance-card-head">
               <span>
@@ -132,7 +174,7 @@ export function WalletOverview({
             <span className="sr-only">{labels.allCurrencies}</span>
             <select name="currency" defaultValue={values.currency ?? ''}>
               <option value="">{labels.allCurrencies}</option>
-              {data.balances.map((balance) => (
+              {balances.map((balance) => (
                 <option key={balance.currencyCode} value={balance.currencyCode}>
                   {balance.currencyCode}
                 </option>

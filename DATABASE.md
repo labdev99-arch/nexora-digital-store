@@ -264,9 +264,45 @@ Columns: `provider_id -> payment_providers null`, `supplier_id -> suppliers null
 - `proof_verifications`: `proof_id -> payment_proofs`, `ai_run_id -> ai_runs null`, `extracted_reference text`, `extracted_amount`, `currency_code`, `confidence numeric(5,4)`, `signals jsonb`, `decision proof_status`, `decided_by -> profiles null`. Proof/created desc; confidence 0..1 and paired amount. Append-only. Finance reads; customer only final safe decision.
 - `refunds`: `order_id -> orders`, `payment_id -> payments null`, `wallet_transaction_id -> wallet_transactions null`, `requested_by -> profiles`, `approved_by -> profiles`, `status refund_status`, `amount`, `currency_code`, `reason_code`, `reason_text`, `provider_reference`, `idempotency_key`, `processed_at`. Unique idempotency and provider reference; order/status indexes; positive amount <= refundable snapshot enforced transactionally. RLS customer reads own/requests eligible; `refunds.approve` and finance manage via commands.
 
+#### Phase 4 implemented payment projection
+
+The checked-in Phase 4 migrations normalize the above conceptual model into
+`payment_methods`, `payments`, `payment_proofs`, `payment_proof_checks`,
+`payment_verification_queue`, `payment_webhook_events`, `payment_refunds`,
+`payment_disputes`, `saved_payment_methods`, `crypto_payment_details`, and the
+append-only `payment_audit_logs`. This removes provider credentials from database
+configuration while retaining data-driven limits, basis-point/fixed fees,
+currencies, countries, tiers, localized instructions, and sandbox mode.
+
+`settle_wallet_topup()` is the authoritative idempotent payment-to-ledger boundary.
+It locks `payments`, splits customer credit and fee into double-entry transfers,
+then stores the resulting `wallet_transaction_id`. Refunds first call
+`reserve_payment_refund()` to move customer funds to a hold, contact the provider,
+and call `finalize_payment_refund()` to capture the hold to platform cash. Provider
+failure releases the hold. The private `payment-proofs` Storage bucket uses an
+owner UUID path segment; finance access is policy controlled. Every Phase 4 table
+has RLS enabled and explicit read/mutation intent in migrations 0013–0015.
+
 ## 8. Orders, service quotes, and fulfillment
 
 ### `orders`, `order_items`, `order_status_events` [core]
+
+#### Phase 5 implemented commerce projection
+
+Migrations 0016–0017 implement `carts`, `cart_items`, tier/country/quantity
+pricing, flash sales and scopes, coupons and redemptions, country tax rules,
+`orders`, `order_items`, append-only `order_events`, encrypted deliveries,
+customer-visible messages, refund requests, and abandoned-cart jobs. Historical
+product, option, warranty, price, fee, and tax data is snapshotted at checkout.
+
+`private.order_transition_allowed()` is authoritative. The status guard rejects
+illegal edges and the event trigger records every accepted edge. Wallet orders
+lock and debit through `pay_order_with_wallet()`; direct providers settle through
+`settle_order_payment()`. Coupon claims lock the offer and order before checking
+global/per-user limits. Checkout keys are unique for the owning profile/guest and
+cart, and all money movement delegates to the Phase 3 append-only double-entry
+ledger. Every implemented table has RLS and every foreign key has a covering
+index.
 
 - `orders` [soft]: `order_number text`, `user_id -> profiles null`, `guest_email_hash text`, `guest_access_token_hash text`, `source order_source`, `status order_status`, `currency_code`, `locale_code`, `country_code`, `quote_id -> quotes`, `subtotal_amount`, `discount_amount`, `tax_amount`, `total_amount`, `paid_amount`, `refunded_amount`, `customer_snapshot_encrypted`, `billing_snapshot_encrypted`, `notes_encrypted`, `placed_at`, `paid_at`, `completed_at`, `affiliate_attribution_id -> affiliate_attributions`, `reseller_account_id -> reseller_accounts`. Unique order number and accepted quote; user/created, status/created, guest hash indexes; totals equation, paid/refunded bounds. State only via transition function. RLS own or signed guest route; staff by permission/scope.
 - `order_items`: `order_id -> orders ON DELETE CASCADE`, `product_id -> products`, `variant_id -> product_variants`, `product_kind`, `fulfillment_mode`, `status order_status`, `sku_snapshot`, `name_snapshot jsonb`, `quantity`, unit/subtotal/discount/tax/total/cost amounts and `currency_code`, `warranty_days`, `option_snapshot_encrypted jsonb`, `target_hash text`, `drip_feed jsonb`, `supplier_cost_amount`, `supplier_cost_currency_code`, `delivered_quantity integer`. Order/status and variant/created indexes; totals and quantity/delivery bounds. Immutable commercial snapshot; delivery counters through function. RLS follows order, cost hidden from customer.
@@ -292,12 +328,16 @@ Columns: `provider_id -> payment_providers null`, `supplier_id -> suppliers null
 
 ### `fulfillment_attempts`, `supplier_circuits`, `manual_tasks`, `manual_task_notes` [core]
 
+Phase 6 implements these concepts as `fulfillment_attempts`, `supplier_circuits`, `manual_fulfillment_tasks`, and `manual_fulfillment_notes`. The explicit prefix keeps the tables distinct from future support-ticket task records.
+
 - `fulfillment_attempts`: `order_item_id -> order_items`, `mode fulfillment_mode`, `supplier_order_id -> supplier_orders null`, `inventory_code_id -> inventory_codes null`, `attempt_no`, `status fulfillment_status`, `started_at`, `finished_at`, `next_retry_at`, `error_category`, `error_safe`, `correlation_id`. Unique item/attempt; due retry and status/created indexes; exactly supplier/inventory/neither by stage. Append-only status event model. Customer sees safe timeline; fulfillment staff/service.
 - `supplier_circuits`: `supplier_id -> suppliers`, `operation text`, `state text`, `failure_count`, `success_count`, `opened_at`, `probe_after`, `last_error_safe`, `version integer`. Unique supplier/operation; probe index; optimistic version. Service/operations read; worker updates through command.
 - `manual_tasks`: `order_id -> orders`, `order_item_id -> order_items null`, `status manual_task_status`, `priority ticket_priority`, `sla_due_at`, `claimed_by -> profiles`, `claimed_at`, `assigned_team text`, `waiting_since`, `completed_at`, `fallback_attempt_id -> fulfillment_attempts`, `version integer`. Unique fallback attempt; queue `(status,priority,sla_due_at)`, claimant/status. Claim uses `FOR UPDATE SKIP LOCKED`; one active task per item constraint. RLS customer sees safe status only; scoped fulfillers/support manage.
 - `manual_task_notes`: `task_id -> manual_tasks`, `author_id -> profiles`, `body_encrypted text`, `visibility text` (`internal|customer`), `asset_id -> file_assets`. Task/created index. Append-only; customer reads customer-visible notes on own order; assigned staff reads all.
 
 ## 9. Async processing
+
+Phase 6 uses the concrete tables `fulfillment_jobs`, `fulfillment_job_attempts`, and `fulfillment_dead_letters`. They implement the generalized outbox/job model below and are intentionally scoped to order fulfillment; later phases may add notification and analytics queues without sharing retry state.
 
 ### `event_outbox`, `job_attempts`, `dead_letter_jobs`, `scheduled_jobs` [core]
 
@@ -510,3 +550,31 @@ Migration CI fails if any new public table lacks RLS, if a policy uses a user-ed
 9. Notifications/marketing/AI/analytics.
 
 Every migration is forward-only, transactional when Postgres permits, seeds deterministic codes with upserts, creates indexes concurrently in a separate production step when tables are large, and includes explicit RLS/policy changes in the same release as its table.
+
+## 23. Phase 11 AI schema
+
+Migrations `0033_phase11_ai_pwa.sql` and `0034_phase11_functions.sql` add `ai_documents`, `ai_jobs`, `ai_conversations`, `ai_messages`, `ai_usage_logs`, `ai_cache`, `product_recommendation_edges`, `profile_recommendations`, `ai_risk_assessments`, `ai_glossary_terms`, `ai_translation_jobs`, and `ai_insights`. Every table has RLS enabled and an explicit grant posture. Customer conversations/messages and personalized recommendations are owner-scoped; operational AI tables require `ai.manage`; public users can read only precomputed product-to-product recommendation edges.
+
+`ai_documents.embedding` is `extensions.vector(1536)` with a partial HNSW cosine index. Rows are unique by source, source ID, and locale. Trigger-created ingestion jobs follow published/active content changes. Orders are intentionally absent from this corpus.
+
+`claim_ai_jobs()` leases due jobs with `FOR UPDATE SKIP LOCKED`; `complete_ai_job()` verifies lease ownership and applies bounded exponential retry or dead-letter status. Both RPCs and `match_ai_documents()` revoke access from `PUBLIC`, `anon`, and `authenticated`, granting execution only to `service_role`.
+
+Risk assessments store the versioned feature snapshot, score, decision, explanations, and reviewer outcome. Translation jobs store source content, proposed content, and the exact glossary snapshot; entity content changes only after approval. AI usage records store provider/model, request hash, token counts, configured cost in integer minor units, latency, cache state, and terminal outcome.
+
+## 22. Phase 7 administration schema
+
+Migrations `0020_phase7_admin.sql`, `0021_phase7_hardening.sql`, and `0022_phase7_realtime.sql` add `customer_tiers`, `loyalty_rules`, `affiliate_accounts`, `support_tickets`, `reviews`, `blog_posts`, `content_pages`, `homepage_banners`, `homepage_sections`, `notification_templates`, `feature_flags`, `platform_settings`, `exchange_rate_history`, and `admin_saved_filters`. Each table uses UUID identity, UTC timestamps, indexed foreign keys and soft deletion where the record lifecycle permits it.
+
+Localized public content is JSONB and exposed only when active/published, in schedule, and not deleted. Administrative configuration has no anon grant. Saved filters are owner-scoped with `owner_id = (SELECT auth.uid())`. Trusted server mutations are additionally constrained by application permission guards and explicit field allowlists.
+
+`audit_logs` now records raw restricted IP/user-agent values in addition to their hashes and is append-only through `private.block_audit_log_mutation()`. UPDATE and DELETE are revoked from anon, authenticated, and service roles; the trigger is the final enforcement layer. The consolidated authenticated SELECT policy accepts `audit.read`, identity management, or finance management without overlapping permissive policies.
+
+# Phase 12 schema addendum
+
+`privacy_consents` is append-oriented consent evidence for authenticated or salted-hash anonymous identities. `data_export_requests` records GDPR export lifecycle without placing export contents in public storage. `account_deletion_requests` enforces one active request and a seven-day cooling-off schedule. `retention_runs` is service-only evidence for the nightly cleanup function.
+
+All four tables have UUID IDs, UTC timestamps, soft-delete fields where relevant, indexes for owner/status/schedule access, enabled RLS, and explicit policy intent. Authenticated users can read/create only their own consent/export/deletion records; retention runs are service-role only. The `ensure_public_tables_have_rls` event trigger enables RLS on future public tables as defense in depth, while CI still refuses a table without an explicit reviewed policy.
+
+`run_data_retention()` has a fixed search path, revoked public/anon/authenticated execution, and service-role-only grant. It removes expired AI cache and reseller nonces, processed notification webhook payloads after 90 days, idempotency records after 400 days, and expires completed export pointers. It records counts/failure code in `retention_runs`. Ledger/order/audit records are not deleted by this job.
+
+Launch indexes cover active account order history, order queues, account payment history, active catalog lookup, and support history. Execute and archive the twenty staging plans in `tests/database/query-performance.sql` before production because the repository cannot substitute for production statistics.

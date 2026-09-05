@@ -4,6 +4,8 @@ import {headers} from 'next/headers';
 import {redirect} from 'next/navigation';
 
 import {createClient} from '@/lib/supabase/server';
+import {verifyTurnstile} from '@/lib/security/turnstile';
+import {clientAddress, enforceRateLimit} from '@/lib/security/rate-limit';
 import {
   emailSchema,
   mfaCodeSchema,
@@ -47,6 +49,21 @@ function appUrl(locale: string, path: string): string {
   return `${origin}/${locale}${path}`;
 }
 
+async function protectAuthRequest(scope: string, turnstileToken?: string): Promise<string | null> {
+  const requestHeaders = await headers();
+  const syntheticRequest = new Request(process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000', {
+    headers: requestHeaders
+  });
+  const rate = await enforceRateLimit(
+    `auth-action:${scope}:${clientAddress(syntheticRequest)}`,
+    8,
+    60
+  );
+  if (!rate.allowed) return 'rate_limited';
+  const challenge = await verifyTurnstile(turnstileToken);
+  return challenge.success ? null : challenge.error;
+}
+
 async function recordCurrentSession(
   supabase: Awaited<ReturnType<typeof createClient>>
 ): Promise<void> {
@@ -62,6 +79,8 @@ async function recordCurrentSession(
 export async function signUpAction(input: unknown): Promise<ActionResult> {
   const parsed = signUpSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
+  const protectionError = await protectAuthRequest('signup', parsed.data.turnstileToken);
+  if (protectionError) return {ok: false, error: protectionError};
   const supabase = await createClient();
   const {error} = await supabase.auth.signUp({
     email: parsed.data.email,
@@ -84,6 +103,8 @@ export async function signUpAction(input: unknown): Promise<ActionResult> {
 export async function signInAction(input: unknown): Promise<ActionResult> {
   const parsed = signInSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
+  const protectionError = await protectAuthRequest('signin', parsed.data.turnstileToken);
+  if (protectionError) return {ok: false, error: protectionError};
   const supabase = await createClient();
   const {error} = await supabase.auth.signInWithPassword({
     email: parsed.data.email,
@@ -101,6 +122,8 @@ export async function signInAction(input: unknown): Promise<ActionResult> {
 export async function sendMagicLinkAction(input: unknown): Promise<ActionResult> {
   const parsed = emailSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
+  const protectionError = await protectAuthRequest('magic-link', parsed.data.turnstileToken);
+  if (protectionError) return {ok: false, error: protectionError};
   const supabase = await createClient();
   const {error} = await supabase.auth.signInWithOtp({
     email: parsed.data.email,
@@ -152,6 +175,8 @@ export async function verifyPhoneOtpAction(input: unknown): Promise<ActionResult
 export async function requestPasswordResetAction(input: unknown): Promise<ActionResult> {
   const parsed = emailSchema.safeParse(input);
   if (!parsed.success) return validationError(parsed.error);
+  const protectionError = await protectAuthRequest('password-reset', parsed.data.turnstileToken);
+  if (protectionError) return {ok: false, error: protectionError};
   const supabase = await createClient();
   const {error} = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
     redirectTo: appUrl(parsed.data.locale, '/auth/callback?next=/auth/reset-password')

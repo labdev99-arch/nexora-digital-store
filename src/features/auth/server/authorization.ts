@@ -45,8 +45,12 @@ const permissionMap: Record<Permission, true> = {
   'account.read': true,
   'account.update': true,
   'reseller.access': true,
+  'reseller.manage': true,
   'affiliate.access': true,
   'support.manage': true,
+  'notifications.manage': true,
+  'knowledge.manage': true,
+  'ai.manage': true,
   'fulfillment.manage': true,
   'finance.manage': true,
   'admin.access': true,
@@ -55,6 +59,15 @@ const permissionMap: Record<Permission, true> = {
   'catalog.manage': true,
   'catalog.read_draft': true,
   'wallet.manage': true,
+  'orders.manage': true,
+  'analytics.read': true,
+  'audit.read': true,
+  'content.manage': true,
+  'marketing.manage': true,
+  'reviews.manage': true,
+  'loyalty.manage': true,
+  'affiliate.manage': true,
+  'import_export.manage': true,
   'platform.own': true
 };
 

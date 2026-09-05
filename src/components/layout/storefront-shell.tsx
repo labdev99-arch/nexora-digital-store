@@ -37,6 +37,7 @@ import {
 import {CurrencySwitcher} from '@/features/preferences/components/currency-switcher';
 import {LocaleSwitcher} from '@/features/preferences/components/language-switcher';
 import {ThemeSwitcher} from '@/features/preferences/components/theme-switcher';
+import {SupportAssistant} from '@/features/ai/components/support-assistant';
 import {Link, useRouter} from '@/i18n/navigation';
 
 const categoryIcons = [Gamepad2, Tv, Gift, UsersRound, HeartHandshake];
@@ -48,6 +49,7 @@ export function StorefrontShell({children}: {children: ReactNode}) {
       {children}
       <StorefrontFooter />
       <MobileTabBar />
+      <SupportAssistant />
     </>
   );
 }
@@ -160,9 +162,10 @@ function StorefrontHeader() {
                 {t('signIn')}
               </Link>
             </Button>
-            <Button variant="ghost" size="icon" className="cart-trigger" aria-label={t('cart')}>
-              <ShoppingBag aria-hidden="true" />
-              <span>2</span>
+            <Button asChild variant="ghost" size="icon" className="cart-trigger">
+              <Link href="/cart" aria-label={t('cart')}>
+                <ShoppingBag aria-hidden="true" />
+              </Link>
             </Button>
             <MobileMenu categories={categories} />
           </div>
@@ -319,10 +322,10 @@ function MobileTabBar() {
         </span>
         <small>{t('wallet')}</small>
       </Link>
-      <a href="#featured">
+      <Link href="/account/orders">
         <ShoppingBag />
         <span>{t('orders')}</span>
-      </a>
+      </Link>
       <a href="#support">
         <Headphones />
         <span>{t('support')}</span>

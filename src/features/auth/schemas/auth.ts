@@ -3,6 +3,7 @@ import {z} from 'zod';
 const email = z.string().trim().email().max(254);
 const password = z.string().min(12).max(128);
 const locale = z.enum(['ar', 'en']);
+const protectedRequest = {turnstileToken: z.string().max(2048).optional()};
 
 export const signUpSchema = z
   .object({
@@ -11,21 +12,28 @@ export const signUpSchema = z
     confirmPassword: z.string(),
     displayName: z.string().trim().min(2).max(80),
     locale,
-    marketingConsent: z.boolean().default(false)
+    marketingConsent: z.boolean().default(false),
+    ...protectedRequest
   })
   .refine((value) => value.password === value.confirmPassword, {
     path: ['confirmPassword'],
     message: 'password_mismatch'
   });
 
-export const signInSchema = z.object({email, password: z.string().min(1).max(128), locale});
-export const emailSchema = z.object({email, locale});
+export const signInSchema = z.object({
+  email,
+  password: z.string().min(1).max(128),
+  locale,
+  ...protectedRequest
+});
+export const emailSchema = z.object({email, locale, ...protectedRequest});
 export const phoneSchema = z.object({
   phone: z
     .string()
     .trim()
     .regex(/^\+[1-9]\d{7,14}$/),
-  locale
+  locale,
+  ...protectedRequest
 });
 export const otpSchema = phoneSchema.extend({token: z.string().regex(/^\d{6}$/)});
 export const resetPasswordSchema = z

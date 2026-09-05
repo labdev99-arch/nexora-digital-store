@@ -24,11 +24,15 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check:colors
+      - run: npm run check:pwa
+      - run: npm run check:rls
+      - run: npm run check:security
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test:run
       - run: npm run build
+      - run: npm run check:performance
 
   auth-e2e:
     if: ${{ secrets.SUPABASE_SECRET_KEY != '' || secrets.SUPABASE_SERVICE_ROLE_KEY != '' }}

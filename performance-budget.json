@@ -1,0 +1,7 @@
+{
+  "lighthouse": {"performance": 90, "accessibility": 95, "bestPractices": 95, "seo": 95},
+  "coreWebVitals": {"lcpMs": 2500, "inpMs": 200, "cls": 0.1},
+  "javascript": {"maxChunkBytes": 450000, "totalSharedBytes": 8000000},
+  "api": {"p95Ms": 750, "errorRate": 0.01},
+  "checkout": {"p95Ms": 1500, "errorRate": 0.01}
+}

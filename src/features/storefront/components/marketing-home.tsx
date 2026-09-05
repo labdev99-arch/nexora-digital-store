@@ -45,17 +45,52 @@ import {
 import {useCurrencyStore} from '@/features/preferences/stores/currency-store';
 import {Link, useRouter} from '@/i18n/navigation';
 import type {AppLocale} from '@/i18n/routing';
+import {RecommendationRail} from '@/features/ai/components/recommendation-rail';
+
+export type ManagedHomepageSection = {
+  id: string;
+  section_type: 'hero' | 'banner' | 'product_carousel' | 'categories_grid' | 'testimonials' | 'faq';
+  content: unknown;
+  configuration: unknown;
+  sort_order: number;
+  starts_at: string | null;
+  ends_at: string | null;
+};
+
+type ManagedContent = {
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  ctaLabel?: string;
+  ctaHref?: string;
+  items?: Array<{title?: string; description?: string; name?: string; quote?: string}>;
+};
 
 const categoryIcons = [Gamepad2, Tv, Gift, UsersRound, HeartHandshake];
 const productAccents = ['violet', 'cyan', 'rose', 'amber', 'emerald'] as const;
 
-export function MarketingHome() {
+export function MarketingHome({
+  managedSections = []
+}: {
+  managedSections?: ManagedHomepageSection[];
+}) {
+  if (managedSections.length > 0) {
+    return (
+      <main id="main" className="managed-homepage">
+        {managedSections.map((section) => (
+          <ManagedSection key={section.id} section={section} />
+        ))}
+        <RecommendationRail />
+      </main>
+    );
+  }
   return (
     <main id="main">
       <MarketingHero />
       <TrustBand />
       <CategoryShowcase />
       <FeaturedProducts />
+      <RecommendationRail />
       <HowItWorks />
       <WalletStory />
       <PaymentStrip />
@@ -64,6 +99,68 @@ export function MarketingHome() {
       <ClosingCta />
     </main>
   );
+}
+
+function ManagedSection({section}: {section: ManagedHomepageSection}) {
+  const locale = useLocale();
+  const content = localizedManagedContent(section.content, locale);
+  const items = Array.isArray(content.items) ? content.items : [];
+  const isHero = section.section_type === 'hero';
+  return (
+    <section className="managed-home-section" data-section={section.section_type}>
+      {isHero ? (
+        <div className="aurora-mesh" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+      ) : null}
+      <div className="site-container managed-home-section-inner">
+        <FadeInUp>
+          {content.eyebrow ? <span className="section-eyebrow">{content.eyebrow}</span> : null}
+          {content.title ? (
+            <h2 className={isHero ? 'display-hero' : undefined}>{content.title}</h2>
+          ) : null}
+          {content.description ? <p>{content.description}</p> : null}
+          {content.ctaLabel ? (
+            <Button asChild variant="gradient" size={isHero ? 'lg' : 'md'}>
+              <Link href={safeManagedHref(content.ctaHref)}>
+                {content.ctaLabel}
+                <ArrowUpRight aria-hidden="true" className="rtl:-scale-x-100" />
+              </Link>
+            </Button>
+          ) : null}
+        </FadeInUp>
+        {items.length > 0 ? (
+          <StaggerList className="managed-home-items">
+            {items.map((item, index) => (
+              <StaggerItem key={`${section.id}-${index}`}>
+                <HoverLift className="managed-home-item">
+                  <Sparkles aria-hidden="true" />
+                  <strong>{item.title ?? item.name ?? ''}</strong>
+                  <p>{item.description ?? item.quote ?? ''}</p>
+                </HoverLift>
+              </StaggerItem>
+            ))}
+          </StaggerList>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function localizedManagedContent(value: unknown, locale: string): ManagedContent {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const localized = value as Record<string, unknown>;
+  const candidate = localized[locale] ?? localized.en ?? localized.ar ?? value;
+  return candidate && typeof candidate === 'object' && !Array.isArray(candidate)
+    ? (candidate as ManagedContent)
+    : {};
+}
+
+function safeManagedHref(value: string | undefined): '/products' | '/categories' {
+  return value === '/categories' ? '/categories' : '/products';
 }
 
 function MarketingHero() {
@@ -92,21 +189,21 @@ function MarketingHero() {
       </div>
       <div className="hero-grid" aria-hidden="true" />
       <div className="site-container marketing-hero-inner">
-        <FadeInUp className="hero-availability">
+        <FadeInUp eager className="hero-availability">
           <span className="live-dot" />
           {t('eyebrow')}
           <Badge tone="accent">{t('new')}</Badge>
         </FadeInUp>
-        <FadeInUp delay={0.04}>
+        <FadeInUp eager delay={0.04}>
           <h1 className="display-hero">
             <span>{t('title')}</span>
             <span className="gradient-text">{t('accent')}</span>
           </h1>
         </FadeInUp>
-        <FadeInUp delay={0.08}>
+        <FadeInUp eager delay={0.08}>
           <p className="hero-lead">{t('description')}</p>
         </FadeInUp>
-        <FadeInUp delay={0.12} className="live-search-wrap">
+        <FadeInUp eager delay={0.12} className="live-search-wrap">
           <form
             className="live-search"
             onSubmit={(event) => {
@@ -162,7 +259,7 @@ function MarketingHero() {
             ))}
           </div>
         </FadeInUp>
-        <FadeInUp delay={0.16} className="hero-actions">
+        <FadeInUp eager delay={0.16} className="hero-actions">
           <Button asChild variant="gradient" size="lg">
             <Link href="/products">
               {t('primary')}
@@ -182,7 +279,7 @@ function MarketingHero() {
             <i>+</i>
           </span>
           <span>
-            <span className="stars" aria-label="4.9 out of 5">
+            <span className="stars" role="img" aria-label="4.9 out of 5">
               <Star />
               <Star />
               <Star />

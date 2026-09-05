@@ -1,0 +1,30 @@
+-- Phase 9 performance hardening: cover every growth-domain foreign key used for joins/deletes.
+CREATE INDEX affiliate_commission_events_actor_idx ON public.affiliate_commission_events(actor_id) WHERE actor_id IS NOT NULL;
+CREATE INDEX affiliate_commission_events_currency_idx ON public.affiliate_commission_events(currency_code);
+CREATE INDEX affiliate_rules_category_idx ON public.affiliate_commission_rules(category_id) WHERE category_id IS NOT NULL;
+CREATE INDEX affiliate_rules_product_idx ON public.affiliate_commission_rules(product_id) WHERE product_id IS NOT NULL;
+CREATE INDEX affiliate_rules_currency_idx ON public.affiliate_commission_rules(currency_code) WHERE currency_code IS NOT NULL;
+CREATE INDEX affiliate_commissions_referred_idx ON public.affiliate_commissions(referred_profile_id,created_at DESC);
+CREATE INDEX affiliate_commissions_rule_idx ON public.affiliate_commissions(rule_id) WHERE rule_id IS NOT NULL;
+CREATE INDEX affiliate_commissions_currency_idx ON public.affiliate_commissions(currency_code,status);
+CREATE INDEX affiliate_commissions_payout_idx ON public.affiliate_commissions(payout_request_id) WHERE payout_request_id IS NOT NULL;
+CREATE INDEX affiliate_assets_locale_idx ON public.affiliate_marketing_assets(locale_code) WHERE locale_code IS NOT NULL;
+CREATE INDEX affiliate_payouts_currency_idx ON public.affiliate_payout_requests(currency_code,status);
+CREATE INDEX affiliate_payouts_reviewer_idx ON public.affiliate_payout_requests(reviewed_by) WHERE reviewed_by IS NOT NULL;
+CREATE INDEX affiliate_payouts_wallet_tx_idx ON public.affiliate_payout_requests(wallet_transaction_id) WHERE wallet_transaction_id IS NOT NULL;
+CREATE INDEX customer_tiers_limit_currency_idx ON public.customer_tiers(limit_currency_code) WHERE limit_currency_code IS NOT NULL;
+CREATE INDEX growth_settings_updated_by_idx ON public.growth_settings(updated_by) WHERE updated_by IS NOT NULL;
+CREATE INDEX referral_attributions_link_idx ON public.referral_attributions(affiliate_link_id) WHERE affiliate_link_id IS NOT NULL;
+CREATE INDEX referral_attributions_click_idx ON public.referral_attributions(click_id);
+CREATE INDEX referral_fraud_attribution_idx ON public.referral_fraud_signals(attribution_id) WHERE attribution_id IS NOT NULL;
+CREATE INDEX referral_fraud_reviewer_idx ON public.referral_fraud_signals(reviewed_by) WHERE reviewed_by IS NOT NULL;
+CREATE INDEX loyalty_badge_awards_badge_idx ON public.loyalty_badge_awards(badge_id);
+CREATE INDEX loyalty_badge_awards_entry_idx ON public.loyalty_badge_awards(points_entry_id) WHERE points_entry_id IS NOT NULL;
+CREATE INDEX loyalty_redemptions_currency_idx ON public.loyalty_redemptions(currency_code) WHERE currency_code IS NOT NULL;
+CREATE INDEX loyalty_redemptions_order_idx ON public.loyalty_redemptions(used_order_id) WHERE used_order_id IS NOT NULL;
+CREATE INDEX loyalty_redemptions_wallet_tx_idx ON public.loyalty_redemptions(wallet_transaction_id) WHERE wallet_transaction_id IS NOT NULL;
+CREATE INDEX loyalty_streak_order_idx ON public.loyalty_streak_events(order_id) WHERE order_id IS NOT NULL;
+CREATE INDEX vip_tier_events_from_idx ON public.vip_tier_events(from_tier_id) WHERE from_tier_id IS NOT NULL;
+CREATE INDEX vip_tier_events_to_idx ON public.vip_tier_events(to_tier_id) WHERE to_tier_id IS NOT NULL;
+CREATE INDEX vip_tier_events_currency_idx ON public.vip_tier_events(currency_code);
+

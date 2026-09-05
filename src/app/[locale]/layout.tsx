@@ -7,6 +7,8 @@ import type {ReactNode} from 'react';
 
 import {Providers} from '@/components/providers';
 import {routing} from '@/i18n/routing';
+import {PwaManager} from '@/features/pwa/components/pwa-manager';
+import {ConsentManager} from '@/features/privacy/components/consent-manager';
 import '../globals.css';
 
 const geist = Geist({subsets: ['latin'], variable: '--font-latin', display: 'swap'});
@@ -52,7 +54,17 @@ export async function generateMetadata({params}: Omit<LayoutProps, 'children'>):
       apple: [{url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png'}]
     },
     openGraph: {title: t('title'), description: t('description'), type: 'website'},
-    twitter: {card: 'summary_large_image', title: t('title'), description: t('description')}
+    twitter: {card: 'summary_large_image', title: t('title'), description: t('description')},
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: 'Nexora',
+      startupImage: [
+        {url: '/splash/splash-640x1136.png', media: '(device-width: 320px)'},
+        {url: '/splash/splash-1170x2532.png', media: '(device-width: 390px)'},
+        {url: '/splash/splash-1290x2796.png', media: '(device-width: 430px)'}
+      ]
+    }
   };
 }
 
@@ -72,7 +84,11 @@ export default async function LocaleLayout({children, params}: LayoutProps) {
     >
       <body>
         <NextIntlClientProvider messages={messages}>
-          <Providers>{children}</Providers>
+          <Providers>
+            {children}
+            <PwaManager />
+            <ConsentManager />
+          </Providers>
         </NextIntlClientProvider>
       </body>
     </html>

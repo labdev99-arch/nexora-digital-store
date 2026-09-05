@@ -17,6 +17,9 @@ import {
 } from '@/features/catalog/server/queries';
 import {translate} from '@/features/catalog/types';
 import type {AppLocale} from '@/i18n/routing';
+import {getProductReviewSummary} from '@/features/reviews/server/queries';
+import {ProductReviews} from '@/features/reviews/components/reviews';
+import {RecommendationRail} from '@/features/ai/components/recommendation-rail';
 
 type Props = {params: Promise<{locale: AppLocale; slug: string}>};
 
@@ -53,10 +56,11 @@ export default async function ProductPage({params}: Props) {
   setRequestLocale(locale);
   const product = await getProductBySlug(slug);
   if (!product) notFound();
-  const [related, catalog, t] = await Promise.all([
+  const [related, catalog, t, reviewSummary] = await Promise.all([
     getRelatedProducts(product.id, locale),
     searchCatalog(locale, {pageSize: 60}),
-    getTranslations({locale, namespace: 'Catalog'})
+    getTranslations({locale, namespace: 'Catalog'}),
+    getProductReviewSummary(product.id)
   ]);
   const primary = product.media.find((item) => item.isPrimary) ?? product.media[0];
   const firstVariant = product.variants[0];
@@ -68,6 +72,20 @@ export default async function ProductPage({params}: Props) {
     image: product.media.map((item) => item.url),
     sku: firstVariant?.sku,
     category: translate(product.categoryName, locale),
+    aggregateRating:
+      Number(reviewSummary.aggregate?.review_count ?? 0) > 0
+        ? {
+            '@type': 'AggregateRating',
+            ratingValue: Number(reviewSummary.aggregate?.average_rating ?? 0),
+            reviewCount: Number(reviewSummary.aggregate?.review_count ?? 0)
+          }
+        : undefined,
+    review: reviewSummary.reviews.slice(0, 5).map((review) => ({
+      '@type': 'Review',
+      reviewRating: {'@type': 'Rating', ratingValue: Number(review.rating)},
+      name: String(review.title ?? ''),
+      reviewBody: String(review.body ?? '')
+    })),
     offers: firstVariant
       ? {
           '@type': 'Offer',
@@ -186,6 +204,8 @@ export default async function ProductPage({params}: Props) {
           title={t('recentlyViewed')}
           labels={cardLabels}
         />
+        <ProductReviews summary={reviewSummary} />
+        <RecommendationRail sourceProductId={product.id} />
         <RecentViewTracker productId={product.id} slug={product.slug} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{__html: safeJson(jsonLd)}} />
         <script

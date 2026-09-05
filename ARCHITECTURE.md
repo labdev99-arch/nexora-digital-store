@@ -205,8 +205,8 @@ The checkout database function locks the active quote, cart, wallet, and relevan
 #### Fulfillment controls
 
 - A fulfillment attempt has a unique `(order_item_id, attempt_number)` and a stable supplier idempotency key.
-- The driver interface is `placeOrder`, `checkStatus`, `getBalance`; adapters return normalized statuses and never write orders.
-- Circuit state is stored per supplier. Retry delays use capped exponential backoff with jitter. Exhausted jobs move to `dead_letter_jobs` and alert operations.
+- The driver interface is `placeOrder`, `checkStatus`, `getBalance`, `cancel`; adapters return normalized statuses and never write orders.
+- Circuit state is stored per supplier. Retry delays use capped exponential backoff with jitter. Exhausted jobs move to `fulfillment_dead_letters` and alert operations.
 - Code inventory uses row locking and a partial unique index so a code is assigned once. Code plaintext is encrypted; only authorized delivery paths decrypt it.
 - `auto_then_manual` creates one manual task only, preserving all failed-attempt context.
 
@@ -216,9 +216,10 @@ The checkout database function locks the active quote, cart, wallet, and relevan
 interface PaymentProvider {
   initiate(input: InitiatePayment): Promise<PaymentInstructions>;
   verify(reference: ProviderReference): Promise<VerifiedPayment>;
-  webhook(request: SignedWebhookRequest): Promise<NormalizedPaymentEvent>;
+  handleWebhook(request: SignedWebhookRequest): Promise<NormalizedPaymentEvent>;
   refund(input: RefundPayment): Promise<RefundResult>;
-  status(reference: ProviderReference): Promise<PaymentStatus>;
+  getStatus(reference: ProviderReference): Promise<PaymentStatus>;
+  capabilities: ReadonlySet<PaymentCapability>;
 }
 
 interface SupplierDriver {
@@ -229,6 +230,13 @@ interface SupplierDriver {
 ```
 
 Adapters are resolved by provider code and versioned configuration. Provider-specific payloads are encrypted JSON evidence; business logic consumes only normalized results.
+
+Phase 4 implements this port in `src/features/payments/server/providers`. A card
+driver alias is selected with `CARD_PAYMENT_PROVIDER`; operational availability,
+limits, basis-point/fixed fees, markets, tiers, instructions and sandbox mode are
+stored in `payment_methods`. `settle_wallet_topup()` is the only payment-to-ledger
+boundary: it locks the payment, posts the Phase 3 double-entry credit and fee, and
+stores the resulting wallet transaction in one idempotent database transaction.
 
 ## 8. Order state machine
 
@@ -253,6 +261,18 @@ Every transition records actor, source, reason, public/private note, previous/ne
 - FX rates use fixed-precision `numeric(24,12)` because rates are ratios, not money. Converted outputs return to integer minor units before persistence.
 - Orders and invoice lines never recalculate historical amounts from current products or FX.
 - Wallets do not exchange currencies implicitly. An explicit FX transfer will use clearing accounts and two linked ledger transfers in a later phase.
+
+Phase 5 implements the pricing pipeline as a pure integer function used only by
+the server pricing service. Checkout persists the complete result on both the
+order and each item, then performs a final stock check before selecting one of
+two money boundaries: `pay_order_with_wallet()` or `settle_order_payment()`.
+Checkout idempotency is unique per profile/guest and cart, so browser retries
+return the original order and can never create a second debit.
+
+Guest carts are identified by a random cookie whose digest is stored in the
+database. On authentication, the callback merges lines by variant and stable
+option fingerprint. Guest orders use a separate order-scoped HttpOnly cookie;
+server routes verify its digest before returning orders, deliveries, or PDFs.
 
 ## 10. Authorization and RLS
 
@@ -340,3 +360,29 @@ Sentry captures releases, source maps, traces, and sanitized errors. Operational
 ## 18. Architecture fitness checks
 
 CI will progressively enforce: strict TypeScript and no `any`; import boundaries; migration/RLS lint (every public table has RLS and at least intended access posture); no float money columns; timestamp/ID conventions; Zod on mutation inputs; provider contract tests; state-machine tests; ledger property tests; RTL/LTR visual tests; accessibility checks; and critical Playwright journeys.
+
+## 20. Phase 11 AI and PWA boundary
+
+AI runs behind a provider-neutral server boundary and is never part of a financial or order-state transaction. Public approved content is embedded in pgvector; authenticated order context is fetched separately through the requesting user's RLS-scoped Supabase client and is never written to the shared vector corpus. Retrieved content is treated as untrusted data. The assistant can answer or open a support ticket, but cannot approve payments or mutate wallets.
+
+The AI worker uses the same Postgres queue semantics as fulfillment: idempotent keys, `SKIP LOCKED` leases, exponential retry, and dead-letter visibility. Recommendation, risk, OCR, translation, and aggregate-insight tasks share observability and configured cost accounting while retaining deterministic fallbacks. `AI_PROVIDER=disabled` is a supported production mode.
+
+The service worker is an untrusted client cache. It may cache public catalog responses and queue only explicitly allowlisted, non-money mutations. Checkout, wallet, payment, reseller order, and admin requests are never background-replayed by the service worker. All replayed requests still pass normal authentication, Zod validation, authorization, and server idempotency.
+
+## 19. Phase 7 administration boundary
+
+`/{locale}/admin` is a trusted server-rendered boundary. The layout requires `admin.access`; each page and route handler then requires a domain permission. A static resource registry allowlists tables, visible columns, editable fields, validation types, and supported operations. The server uses trusted credentials only after authorization and never sends those credentials to client components.
+
+Generic administration deliberately excludes invariant-changing writes for orders, payments, wallets, and stock codes. Those resources remain readable/exportable through the console but mutate only through their Phase 3–6 command functions and queues. All accepted generic writes create an append-only audit event with actor, request metadata, and before/after snapshots.
+
+Business-intelligence queries aggregate the authoritative operational tables at request time and convert reporting values through configured integer exchange rates. The homepage builder stores localized, scheduled sections as JSONB; the public homepage reads only rows allowed by its published-content RLS policy and caches them for one minute.
+
+# Phase 12 launch-hardening addendum
+
+Phase 12 adds a cross-cutting trust boundary in middleware before locale or business routing. Unsafe browser API requests must pass same-origin/Fetch Metadata CSRF checks and endpoint-class rate limits. Cron, payment/notification webhooks, and reseller/SMM endpoints bypass browser-origin checks only because they use bearer/HMAC/provider signatures and replay protection. Upstash is the distributed production counter; memory is a local fallback.
+
+Every response receives CSP/HSTS/frame/referrer/permissions protections. Next.js receives a per-request nonce, while payment and Turnstile frames and Supabase/Sentry/Upstash connections are explicitly allowlisted. The Sentry client/server/edge setup sends no default PII and strips request bodies, cookies, and authorization data. Structured application logs redact identity and credential-shaped keys.
+
+The privacy boundary consists of consent history, authenticated JSON export, delayed deletion requests, and a nightly service-role retention function. Financial ledger, audit, dispute, and statutory records are preserved/pseudonymized rather than mutated. Private delivery, support, review, and payment files continue to use scoped, short-lived signed URLs.
+
+CI now treats security as code: migration scanning requires RLS plus policy intent for every table, live audits query `pg_class`/`pg_policy` when a staging URL is supplied, mutation routes require an authorization/signature marker, client bundles are scanned for suspicious secrets, and performance budgets run after build. `/api/health` is safe for external uptime monitors and exposes only coarse dependency status/version/region.

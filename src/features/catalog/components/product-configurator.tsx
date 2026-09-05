@@ -62,7 +62,20 @@ export function ProductConfigurator({product}: {product: CatalogProduct}) {
       });
       return;
     }
-    toast.success(t('configurationReady'));
+    startTransition(async () => {
+      const cartQuantity = quantityField ? Number(values[quantityField.key] ?? 1) : 1;
+      const response = await fetch(`/api/cart?locale=${locale}`, {
+        method: 'POST',
+        headers: {'content-type': 'application/json'},
+        body: JSON.stringify({
+          variantId: variant?.id,
+          quantity: Number.isSafeInteger(cartQuantity) && cartQuantity > 0 ? cartQuantity : 1,
+          optionValues: {...values, ...(smmConfig?.dripFeedEnabled ? {drip_feed: dripFeed} : {})}
+        })
+      });
+      if (response.ok) toast.success(t('addedToCart'));
+      else toast.error(t('cartError'));
+    });
   };
 
   if (!variant) return <p>{t('unavailable')}</p>;

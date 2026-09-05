@@ -114,6 +114,8 @@ Each phase is a production-capable vertical increment. A phase is accepted only 
 
 ## Phase 6 — Automatic and manual fulfillment
 
+**Implementation status:** code complete; production migration and live sandbox acceptance pending explicit deployment approval.
+
 ### Deliverables
 
 - Atomic encrypted code inventory assignment and inventory controls.
@@ -130,40 +132,45 @@ Each phase is a production-capable vertical increment. A phase is accepted only 
 - Unauthorized staff cannot claim, inspect, or deliver tasks outside permissions.
 - Auto and manual critical E2E purchases finish in delivered/completed state and notify the customer.
 
-## Phase 7 — Support, reviews, disputes, and knowledge base
+## Phase 7 — Administration and business intelligence
+
+**Implementation status:** complete; migrations `0020`–`0022` applied to production Supabase.
 
 ### Deliverables
 
-- Ticket categories/priority/SLA, order-linked chat, attachments, canned replies, assignment/escalation.
-- Refund/dispute workflow integrated with payment and wallet compensations.
-- Public localized FAQ/knowledge base with search and admin versioning.
-- Verified-purchase-only reviews, images, moderation and official replies.
-- Customer/staff realtime inboxes and SLA dashboards.
+- Executive dashboard with date/currency controls, profit from supplier cost, funnel, customer mix, rankings, wallet float, manual queue, supplier reliability and live activity.
+- Cohort retention, LTV and churn analysis.
+- Permission-aware CRUD hub for commerce, customer, finance, operations, marketing and content domains.
+- Drag-sortable, scheduled, localized homepage builder connected to the public storefront.
+- Localized notification/email template editor with declared-variable preview.
+- Saved filters, bulk actions, CSV/SpreadsheetML import-export and searchable append-only audit explorer.
 
 ### Acceptance criteria
 
-- Ticket and chat RLS prevents cross-customer access, including Realtime and Storage.
-- SLA timers pause/resume/escalate according to configured calendars.
-- Only eligible delivered purchases can review once per item; moderation is audited.
-- Approved refunds create one provider/ledger result and consistent order history.
-- Knowledge drafts remain staff-only; published locale fallbacks are deterministic.
+- Admin pages and handlers enforce `admin.access` plus the resource permission; navigation exposes only authorized areas.
+- Generic CRUD cannot mutate wallet balances, payments, order state or encrypted stock payloads.
+- Dashboard values come from order, supplier-cost, wallet, payment and fulfillment sources and convert with configured rates.
+- Every administrative mutation writes an immutable before/after audit record.
+- All new tables have RLS and explicit grants; advisor findings introduced by the phase are remediated.
+- Strict typecheck, lint, unit tests, token-color gate and production build pass.
 
-## Phase 8 — Loyalty, affiliate, and reseller platform
+## Phase 8 — Reseller platform and public API
+
+**Implementation status:** complete; migrations `0023`–`0026` applied and verified in production Supabase.
 
 ### Deliverables
 
-- Points ledger, configurable earn/burn/expiry, VIP tiers/perks, streaks, badges, multipliers, animated progress.
-- Referral links/codes, cookie + server attribution, two-level commissions and category overrides, fraud signals, payout workflow.
-- Wholesale tiers/volume upgrades, reseller dashboard and sandbox mode.
-- REST API v1, scoped API keys, HMAC signing, timestamp/nonces, per-key rates, idempotency, webhooks and OpenAPI docs.
+- Bronze/Silver/Gold/Platinum wholesale tiers, 30-day volume upgrades, audited manual override, credit limits, and tier-specific pricing.
+- Localized reseller dashboard, bulk orders, spend history, balances, downloadable price lists, key and webhook management.
+- REST API v1, scoped sandbox/live keys, HMAC signing, timestamp/nonces, IP allowlists, atomic per-key rates, and idempotent orders.
+- Signed outgoing webhooks with exponential retry/dead-letter handling, OpenAPI 3.1 documentation, and SMM-panel compatibility.
 
 ### Acceptance criteria
 
-- Points/commission ledgers reconcile and concurrent awards cannot duplicate.
-- Self-referral and same-device cases are held for review, not silently paid.
 - Tier changes affect only new quotes and preserve prior order snapshots.
-- API signature replay/expiry/scope/rate/idempotency contract tests pass.
-- Reseller purchase/refund/webhook E2E flows pass in sandbox and provider-stub modes.
+- Sandbox orders cannot touch live balances; live orders reuse the wallet ledger and fulfillment pipeline.
+- Signed requests reject tampering, stale timestamps, replayed nonces, scope violations, disallowed IPs, and rate-limit excess.
+- Webhook deliveries are signed, logged, retried, and eventually moved to a visible dead-letter state.
 
 ## Phase 9 — Notifications, PWA, and growth surfaces
 
@@ -218,3 +225,16 @@ Each phase is a production-capable vertical increment. A phase is accepted only 
 - Backup restore and wallet reconciliation drills complete within agreed RTO/RPO.
 - Critical E2E, WCAG 2.1 AA, RTL, performance budgets, failure injection and webhook replay suites pass.
 - Production readiness review signs off payments, refunds, fulfillment fallback, incident response, privacy, and observability.
+
+## Phase 11 implementation alignment — AI and PWA
+
+The executed Phase 11 follows the current master specification: isolated support RAG, hybrid recommendations, explainable fraud scoring, proof OCR, reviewed translation, admin intelligence, and a fully optional provider abstraction; plus manifest, service worker, offline shell, safe background sync, push handling, splash screens, and install UX. Its schema is delivered by migrations `0033` and `0034`, with implementation and operational details in `PHASE_11.md`.
+
+### Acceptance criteria
+
+- Shared embeddings contain public approved content only; a user's order context is fetched server-side under that user's RLS identity.
+- AI-disabled mode preserves every core store flow, and no AI output can directly move money or approve a financial action.
+- Recommendations provide collaborative, content-similarity, personalized, cross-sell, and popularity fallback paths.
+- Risk/OCR/translation decisions remain explainable and human-reviewable; usage records include tokens, configured cost, latency, model, and outcome.
+- The PWA is installable and provides localized offline navigation, cache versioning, push handling, and an allowlisted non-financial sync queue.
+- Type, lint, unit, PWA static, production build, and database security checks pass before release.

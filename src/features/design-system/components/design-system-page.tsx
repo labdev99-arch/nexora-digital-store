@@ -34,13 +34,13 @@ import {
 } from '@/components/motion';
 import {
   AnimatedCounter,
-  ChartCard,
   CommandPalette,
   CopyButton,
   CountdownTimer,
   PriceDisplay,
   StatCard
 } from '@/components/ui/advanced';
+import {ChartCard} from '@/components/ui/chart-card';
 import {Button} from '@/components/ui/button';
 import {
   Checkbox,

@@ -1,6 +1,6 @@
 'use client';
 
-import {motion, type HTMLMotionProps, type Variants} from 'framer-motion';
+import {m as motion, type HTMLMotionProps, type Variants} from 'framer-motion';
 import {useState, type ComponentProps, type ReactNode} from 'react';
 
 import {usePrefersReducedMotion} from '@/hooks/use-prefers-reduced-motion';
@@ -31,13 +31,14 @@ export function FadeInUp({
   children,
   className,
   delay = 0,
+  eager = false,
   ...props
-}: HTMLMotionProps<'div'> & {children: ReactNode; delay?: number}) {
+}: HTMLMotionProps<'div'> & {children: ReactNode; delay?: number; eager?: boolean}) {
   const reduced = usePrefersReducedMotion();
   return (
     <motion.div
       className={className}
-      initial={reduced ? false : 'hidden'}
+      initial={reduced || eager ? false : 'hidden'}
       whileInView="visible"
       viewport={{once: true, margin: '-64px'}}
       variants={fadeInUp}

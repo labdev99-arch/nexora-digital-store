@@ -6,6 +6,8 @@ import {walletStatementFiltersSchema} from '@/features/wallet/schemas/wallet';
 import {getWalletOverview} from '@/features/wallet/server/queries';
 import {requireUser} from '@/features/auth/server/authorization';
 import type {AppLocale} from '@/i18n/routing';
+import {Link} from '@/i18n/navigation';
+import {Button} from '@/components/ui/button';
 
 type Props = {
   params: Promise<{locale: AppLocale}>;
@@ -49,37 +51,50 @@ export default async function WalletPage({params, searchParams}: Props) {
     'chargeback'
   ] as const;
   return (
-    <WalletOverview
-      locale={locale}
-      data={data}
-      page={filters.page}
-      pageSize={pageSize}
-      values={{currency: filters.currency, type: filters.type, from: filters.from, to: filters.to}}
-      labels={{
-        title: t('title'),
-        description: t('description'),
-        protected: t('protected'),
-        available: t('available'),
-        held: t('held'),
-        frozen: t('frozen'),
-        statement: t('statement.title'),
-        statementDescription: t('statement.description'),
-        allCurrencies: t('filters.allCurrencies'),
-        allTypes: t('filters.allTypes'),
-        from: t('filters.from'),
-        to: t('filters.to'),
-        filter: t('filters.apply'),
-        clear: t('filters.clear'),
-        csv: t('export.csv'),
-        pdf: t('export.pdf'),
-        emptyTitle: t('empty.title'),
-        emptyDescription: t('empty.description'),
-        details: t('details'),
-        page: t.raw('pagination.page') as string,
-        previous: t('pagination.previous'),
-        next: t('pagination.next'),
-        types: Object.fromEntries(typeKeys.map((key) => [key, t(`types.${key}`)]))
-      }}
-    />
+    <>
+      <div className="wallet-topup-launch">
+        <Button asChild variant="gradient">
+          <Link href="/account/wallet/top-up">{t('topupAction')}</Link>
+        </Button>
+      </div>
+      <WalletOverview
+        locale={locale}
+        profileId={context.user.id}
+        data={data}
+        page={filters.page}
+        pageSize={pageSize}
+        values={{
+          currency: filters.currency,
+          type: filters.type,
+          from: filters.from,
+          to: filters.to
+        }}
+        labels={{
+          title: t('title'),
+          description: t('description'),
+          protected: t('protected'),
+          available: t('available'),
+          held: t('held'),
+          frozen: t('frozen'),
+          statement: t('statement.title'),
+          statementDescription: t('statement.description'),
+          allCurrencies: t('filters.allCurrencies'),
+          allTypes: t('filters.allTypes'),
+          from: t('filters.from'),
+          to: t('filters.to'),
+          filter: t('filters.apply'),
+          clear: t('filters.clear'),
+          csv: t('export.csv'),
+          pdf: t('export.pdf'),
+          emptyTitle: t('empty.title'),
+          emptyDescription: t('empty.description'),
+          details: t('details'),
+          page: t.raw('pagination.page') as string,
+          previous: t('pagination.previous'),
+          next: t('pagination.next'),
+          types: Object.fromEntries(typeKeys.map((key) => [key, t(`types.${key}`)]))
+        }}
+      />
+    </>
   );
 }
