@@ -13,7 +13,7 @@ export async function GET() {
   if (url && key) {
     try {
       const response = await fetch(`${url}/rest/v1/locales?select=code&limit=1`, {
-        headers: {apikey: key, authorization: `Bearer ${key}`},
+        headers: {apikey: key},
         cache: 'no-store',
         signal: AbortSignal.timeout(3_000)
       });
