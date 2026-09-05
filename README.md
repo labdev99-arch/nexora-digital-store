@@ -23,6 +23,7 @@ Database destructive/concurrency suites must only run against a disposable datab
 
 ## Deployment
 
+- Production storefront: `https://nexora-digital-store.vercel.app`.
 - Frontend and cron entry points: Vercel.
 - Database, Auth, private Storage, Realtime, and database functions: Supabase.
 - CI: GitHub Actions on pushes to `main` and pull requests.
